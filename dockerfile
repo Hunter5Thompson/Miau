@@ -11,15 +11,23 @@ COPY cudnn/include/* /usr/local/include/cudnn/
 # Erstelle CUDA-Verzeichnisse und setze ldconfig
 RUN mkdir -p /usr/local/cuda/lib64 /usr/local/cuda/include && \
     # Direkte Kopien statt Symlinks (robuster)
-    cp /usr/local/lib/cudnn/libcudnn* /usr/local/cuda/lib64/ 2>/dev/null || true && \
-    cp /usr/local/include/cudnn/cudnn*.h /usr/local/cuda/include/ 2>/dev/null || true && \
+    # Fail fast if essential cuDNN files are not found from the COPY step
+    echo "Copying cuDNN libraries to /usr/local/cuda/lib64..." && \
+    cp /usr/local/lib/cudnn/libcudnn* /usr/local/cuda/lib64/ && \
+    echo "Verifying cuDNN libraries in /usr/local/cuda/lib64..." && \
+    ls -1 /usr/local/cuda/lib64/libcudnn* && \
+    echo "Copying cuDNN headers to /usr/local/cuda/include..." && \
+    cp /usr/local/include/cudnn/cudnn*.h /usr/local/cuda/include/ && \
+    echo "Verifying cuDNN headers in /usr/local/cuda/include..." && \
+    ls -1 /usr/local/cuda/include/cudnn*.h && \
     # Update library cache
     echo "/usr/local/lib/cudnn" > /etc/ld.so.conf.d/cudnn.conf && \
     echo "/usr/local/cuda/lib64" > /etc/ld.so.conf.d/cuda.conf && \
     ldconfig && \
-    # Verifikation
+    # Verifikation (original)
+    echo "Final verification listing of copied cuDNN files:" && \
     ls -la /usr/local/lib/cudnn/ && \
-    ls -la /usr/local/cuda/lib64/libcudnn* || echo "cuDNN files copied"
+    ls -la /usr/local/cuda/lib64/libcudnn* || echo "cuDNN files listing after ldconfig"
 
 # Umgebungsvariablen
 ENV PIP_DEFAULT_TIMEOUT=100 \

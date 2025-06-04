@@ -218,7 +218,6 @@ class MLPipelineOrchestrator:
         # Initialize all services
         self.transcription_service = TranscriptionService(model_loader, hardware_caps)
         self.alignment_service = AlignmentService(hardware_caps, model_cache_dir) # Pass model_cache_dir
-        self.diarization_service = DiarizationService(hardware_caps, hf_token)
         self.protocol_service = ProtocolService()
         self.diarization_service = create_enhanced_diarization_service(hardware_caps, hf_token)
 
@@ -551,8 +550,8 @@ class MLPipelineOrchestrator:
         logger.info("🧹 Cleaning up ML pipeline resources...")
 
         try:
-            if hasattr(self.alignment_service, 'cleanup_cache'):
-                self.alignment_service.cleanup_cache()
+            if hasattr(self.alignment_service, 'clear_internal_cache'):
+                self.alignment_service.clear_internal_cache()
             if hasattr(self.diarization_service, 'cleanup_resources'):
                 self.diarization_service.cleanup_resources()
             # Transcription models are typically managed by ModelLoader or cleaned up by TranscriptionService itself

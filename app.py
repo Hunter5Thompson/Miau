@@ -24,10 +24,10 @@ from pathlib import Path
 from config.hardware_detection import initialize_hardware, get_hardware_capabilities
 from config.nexus_integration import create_enhanced_model_loader
 enhanced_model_loader = create_enhanced_model_loader()
-from config import app_settings
-settings = app_settings.initialize_settings()
-from config.app_settings import initialize_settings, get_settings
-settings = app_settings.initialize_settings() # Sicherstellen, dass settings hier initialisiert wird
+from config.app_settings import initialize_settings # Import initialize_settings directly
+settings = initialize_settings() # Initialize once
+# If get_settings is needed later by other code in app.py, it would be imported then.
+# For now, assume only initialize_settings is used at this stage in app.py.
 
 # Audio Services
 from services.audio_service import AudioService, AudioValidationError
@@ -37,7 +37,7 @@ from services.audio_preprocessing import (
 )
 
 # ML Services
-from services.ml_pipeline import (
+from config.ml_pipeline import (
     MLPipelineOrchestrator, PipelineConfig, PipelineMode, PipelineProgress
 )
 
@@ -405,7 +405,7 @@ async def transcribe_audio_refactored(
 
         if not is_valid:
             if upload_path.exists():
-                await asyncio.to_thread(upload_path.unlink, True)
+                await asyncio.to_thread(upload_path.unlink, missing_ok=True)
             raise HTTPException(400, f"Invalid audio: {message}")
 
         logger.info(
@@ -415,7 +415,7 @@ async def transcribe_audio_refactored(
 
     except AudioValidationError as e:
         if upload_path.exists():
-            await asyncio.to_thread(upload_path.unlink, True)
+            await asyncio.to_thread(upload_path.unlink, missing_ok=True)
         raise HTTPException(400, f"Audio validation failed: {e}")
 
     # === GET PROCESSING RECOMMENDATIONS ===
@@ -673,7 +673,7 @@ async def process_with_ml_pipeline(
         # Clean up upload file
         try:
             if file_path.exists():
-                await asyncio.to_thread(file_path.unlink, True) # missing_ok=True für Python 3.8+
+                await asyncio.to_thread(file_path.unlink, missing_ok=True) # missing_ok=True für Python 3.8+
                 logger.info(f"🗑️ Upload file cleaned up: {file_path.name}")
         except Exception as e:
             logger.warning(f"⚠️ Upload cleanup failed: {e}")

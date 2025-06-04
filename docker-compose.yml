@@ -81,7 +81,6 @@ services:
       - CUDNN_BENCHMARK=1
       
       # LD_LIBRARY_PATH (cuDNN via Dockerfile eingebaut)
-      - LD_LIBRARY_PATH=/usr/local/lib/cudnn:/usr/local/lib/python3.11/site-packages/nvidia/cudnn/lib/:/usr/local/lib/python3.11/site-packages/nvidia/cuda_runtime/lib/:/usr/local/lib/python3.11/site-packages/nvidia/cublas/lib/:${LD_LIBRARY_PATH}
       
     shm_size: '4gb'
     

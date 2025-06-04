@@ -517,7 +517,8 @@ class ProtocolFormatter:
         # Generate formatted text
         formatted_text = self._generate_formatted_text(
             processed_segments, topics, decisions, action_items,
-            municipality, meeting_date, meeting_type, metadata
+            municipality, meeting_date, meeting_type, metadata,
+            diarization_result_obj=diarization_result # Pass the full object here
         )
         
         processing_time = time.time() - start_time
@@ -607,24 +608,32 @@ class ProtocolFormatter:
         municipality: str,
         meeting_date: str,
         meeting_type: str,
-        metadata: Optional[Dict[str, Any]]
+        metadata: Optional[Dict[str, Any]],
+        # Add this parameter:
+        diarization_result_obj: DiarizationResult
     ) -> str:
         """Generate the final formatted protocol text"""
         
         parts = []
+
+        # Create speaker ID to label map
+        speaker_id_to_label_map = {
+            profile.speaker_id: profile.speaker_label
+            for profile in diarization_result_obj.speakers
+        }
         
         # Header
         if self.config.include_header:
             header = self._generate_header(municipality, meeting_date, meeting_type, metadata)
             parts.append(header)
         
-        # Main content
+        # Main content - pass the map
         if self.config.group_by_topic and topics:
-            content = self._generate_topic_based_content(topics)
+            content = self._generate_topic_based_content(topics, speaker_id_to_label_map)
         elif self.config.group_by_speaker:
-            content = self._generate_speaker_based_content(segments)
+            content = self._generate_speaker_based_content(segments, speaker_id_to_label_map)
         else:
-            content = self._generate_chronological_content(segments)
+            content = self._generate_chronological_content(segments, speaker_id_to_label_map)
         
         parts.append(content)
         
@@ -689,7 +698,7 @@ TAGESORDNUNG
 Datum: {formatted_date}
 Automatische Transkription"""
     
-    def _generate_topic_based_content(self, topics: List[TopicSegment]) -> str:
+    def _generate_topic_based_content(self, topics: List[TopicSegment], speaker_id_to_label_map: Dict[str, str]) -> str:
         """Generate content organized by topics"""
         content_parts = []
         
@@ -701,7 +710,7 @@ Automatische Transkription"""
                 timestamp = self._format_timestamp(segment.start)
                 
                 if self.config.use_speaker_names and segment.speaker_id != last_speaker:
-                    speaker_label = self._get_speaker_label(segment.speaker_id)
+                    speaker_label = speaker_id_to_label_map.get(segment.speaker_id, segment.speaker_id)
                     topic_parts.append(f"\n{speaker_label} {timestamp}: ")
                     last_speaker = segment.speaker_id
                 elif not self.config.use_speaker_names:
@@ -713,7 +722,7 @@ Automatische Transkription"""
         
         return "\n".join(content_parts)
     
-    def _generate_speaker_based_content(self, segments: List[SpeakerSegment]) -> str:
+    def _generate_speaker_based_content(self, segments: List[SpeakerSegment], speaker_id_to_label_map: Dict[str, str]) -> str:
         """Generate content organized by speakers"""
         # Group segments by speaker
         speaker_segments = {}
@@ -724,7 +733,7 @@ Automatische Transkription"""
         
         content_parts = []
         for speaker_id, speaker_segs in speaker_segments.items():
-            speaker_label = self._get_speaker_label(speaker_id)
+            speaker_label = speaker_id_to_label_map.get(speaker_id, speaker_id)
             content_parts.append(f"\n{speaker_label}:")
             
             for segment in sorted(speaker_segs, key=lambda x: x.start):
@@ -733,7 +742,7 @@ Automatische Transkription"""
         
         return "\n".join(content_parts)
     
-    def _generate_chronological_content(self, segments: List[SpeakerSegment]) -> str:
+    def _generate_chronological_content(self, segments: List[SpeakerSegment], speaker_id_to_label_map: Dict[str, str]) -> str:
         """Generate chronological content"""
         content_parts = []
         last_speaker = None
@@ -742,7 +751,7 @@ Automatische Transkription"""
             timestamp = self._format_timestamp(segment.start)
             
             if self.config.use_speaker_names and segment.speaker_id != last_speaker:
-                speaker_label = self._get_speaker_label(segment.speaker_id)
+                speaker_label = speaker_id_to_label_map.get(segment.speaker_id, segment.speaker_id)
                 content_parts.append(f"\n{speaker_label} {timestamp}: {segment.text}")
                 last_speaker = segment.speaker_id
             else:
@@ -862,19 +871,6 @@ Automatische Transkription"""
         
         return ""
     
-    def _get_speaker_label(self, speaker_id: str) -> str:
-        """Get formatted speaker label"""
-        # This could be enhanced to use custom speaker names
-        if speaker_id.startswith("SPEAKER_"):
-            # Convert SPEAKER_00 to Speaker A, etc.
-            try:
-                num = int(speaker_id.split("_")[1])
-                return f"Speaker {chr(ord('A') + num)}"
-            except (IndexError, ValueError):
-                pass
-        
-        return speaker_id
-
 
 class ProtocolService:
     """
