@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemeinderats-Transkription</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Tailwind gray-100 */
+        }
+        .progress-bar-bg {
+            background-color: #e5e7eb; /* Tailwind gray-200 */
+        }
+        .progress-bar-fill {
+            background-color: #3b82f6; /* Tailwind blue-500 */
+            transition: width 0.3s ease-in-out, background-color 0.3s ease-in-out;
+        }
+        .progress-bar-fill.completed {
+            background-color: #22c55e; /* Tailwind green-500 */
+        }
+        .progress-bar-fill.failed {
+            background-color: #ef4444; /* Tailwind red-500 */
+        }
+        /* Custom scrollbar für bessere Optik */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #a0aec0; /* Tailwind gray-400 */
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #718096; /* Tailwind gray-500 */
+        }
+        /* Animation für Benachrichtigungen */
+        .toast {
+            transition: opacity 0.5s, transform 0.5s;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        .toast-enter-from, .toast-leave-to {
+            opacity: 0;
+            transform: translateY(-20px) scale(0.95);
+        }
+        .toast-enter-to, .toast-leave-from {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+        .btn-spinner {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .job-card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .job-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); /* Tailwind shadow-lg */
+        }
+    </style>
+</head>
+<body class="antialiased text-gray-800">
+    <div class="container mx-auto p-4 md:p-8 max-w-5xl min-h-screen">
+        <header class="mb-8 text-center">
+            <svg class="w-16 h-16 mx-auto mb-3 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5h0M6.375 6.375a6 6 0 006 6m6-6a6 6 0 00-6-6m0 0a6 6 0 00-6 6m6-6H9m3 0h3.375M6.375 6.375L6 18.75m6.375-12.375L12 18.75m3.375-12.375L18 18.75" />
+            </svg>
+            <h1 class="text-4xl font-bold text-gray-700">Gemeinderats-Transkription</h1>
+            <p class="text-lg text-gray-500 mt-2">Audio-Dateien hochladen und automatisch protokollieren lassen.</p>
+        </header>
+
+        <div id="notification-container" class="fixed top-5 right-5 z-50 space-y-3 w-full max-w-xs sm:max-w-sm"></div>
+
+        <section id="upload-section" class="mb-10 bg-white p-6 sm:p-8 rounded-xl shadow-xl">
+            <h2 class="text-2xl font-semibold mb-6 text-gray-700 border-b pb-3">Neue Transkription starten</h2>
+            <form id="upload-form" class="space-y-6">
+                <div>
+                    <label for="file" class="block text-sm font-medium text-gray-600 mb-1">Audiodatei auswählen</label>
+                    <input type="file" id="file" name="file" required accept=".mp3,.wav,.mp4,.m4a,.flac,.ogg"
+                           class="block w-full text-sm text-gray-500 file:mr-4 file:py-2.5 file:px-4
+                                  file:rounded-lg file:border-0 file:text-sm file:font-semibold
+                                  file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100
+                                  border border-gray-300 rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="municipality" class="block text-sm font-medium text-gray-600 mb-1">Gemeinde/Stadt</label>
+                        <input type="text" id="municipality" name="municipality" required placeholder="z.B. Musterstadt"
+                               class="mt-1 block w-full px-3 py-2.5 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="meeting_date" class="block text-sm font-medium text-gray-600 mb-1">Sitzungsdatum</label>
+                        <input type="date" id="meeting_date" name="meeting_date" required
+                               class="mt-1 block w-full px-3 py-2.5 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="meeting_type" class="block text-sm font-medium text-gray-600 mb-1">Sitzungstyp</label>
+                        <input type="text" id="meeting_type" name="meeting_type" value="Stadtrat" placeholder="z.B. Stadtrat, Ausschuss"
+                               class="mt-1 block w-full px-3 py-2.5 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    </div>
+                    <div>
+                        <label for="model_name" class="block text-sm font-medium text-gray-600 mb-1">Whisper-Modell</label>
+                        <select id="model_name" name="model_name"
+                                class="mt-1 block w-full px-3 py-2.5 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <option value="large-v3">Large v3 (Neuestes)</option>
+                            <option value="large-v2" selected>Large v2 (Standard)</option>
+                            <option value="medium">Medium</option>
+                            <option value="small">Small</option>
+                            <option value="base">Base</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="flex items-center">
+                    <input id="diarize" name="diarize" type="checkbox" checked
+                           class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                    <label for="diarize" class="ml-3 block text-sm text-gray-700">Sprechererkennung (Diarisierung)</label>
+                </div>
+
+                <div>
+                    <button type="submit" id="upload-button"
+                            class="w-full flex items-center justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-60 disabled:cursor-not-allowed transition-colors duration-150">
+                        <svg id="upload-spinner" class="btn-spinner -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        Transkription starten
+                    </button>
+                </div>
+            </form>
+        </section>
+
+        <section id="jobs-section" class="bg-white p-6 sm:p-8 rounded-xl shadow-xl">
+            <div class="flex justify-between items-center mb-6 border-b pb-3">
+                <h2 class="text-2xl font-semibold text-gray-700">Aktive und abgeschlossene Jobs</h2>
+                <button id="refresh-jobs-button" title="Jobs aktualisieren"
+                        class="p-2 rounded-full text-gray-500 hover:text-blue-600 hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors duration-150">
+                    <svg id="refresh-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m-15.357-2a8.001 8.001 0 0015.357 2M15 15h-4.581" />
+                    </svg>
+                    <svg id="refresh-spinner" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 btn-spinner hidden" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </button>
+            </div>
+            <div id="jobs-list-container" class="space-y-5">
+                <p id="no-jobs-message" class="text-gray-500 text-center py-6 text-lg">Noch keine Jobs vorhanden oder geladen.</p>
+                </div>
+        </section>
+    </div>
+
+    <div id="result-modal" class="fixed inset-0 bg-gray-800 bg-opacity-75 backdrop-blur-sm overflow-y-auto h-full w-full flex items-center justify-center hidden z-40 p-4" role="dialog" aria-modal="true" aria-labelledby="modal-title-heading">
+        <div class="relative mx-auto p-5 sm:p-6 border-0 w-full max-w-3xl shadow-2xl rounded-xl bg-white transform transition-all">
+            <div class="mt-3 text-left">
+                <div class="flex justify-between items-start mb-4 pb-3 border-b border-gray-200">
+                    <h3 class="text-xl leading-6 font-semibold text-gray-900" id="modal-title-heading">Transkriptionsergebnis</h3>
+                    <button id="close-modal-button" type="button" class="p-1 -m-1 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+                        <span class="sr-only">Schließen</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="mt-2 space-y-4 max-h-[70vh] overflow-y-auto pr-2 text-sm" id="modal-content-area">
+                    <div id="modal-metadata" class="text-gray-600 space-y-1 bg-gray-50 p-3 rounded-md"></div>
+                    <div class="mt-4">
+                        <h4 class="text-md font-medium text-gray-800 mb-2">Transkriptionstext:</h4>
+                        <textarea id="modal-transcription-text" readonly 
+                                  class="w-full h-64 p-3 border border-gray-300 rounded-md bg-gray-50 text-gray-700 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"></textarea>
+                    </div>
+                    <div id="modal-download-link-container" class="mt-4">
+                        </div>
+                </div>
+                <div class="mt-5 sm:mt-6 pt-4 border-t border-gray-200 flex flex-col sm:flex-row-reverse gap-3">
+                    <button id="copy-text-button" type="button"
+                            class="w-full sm:w-auto inline-flex items-center justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        Text kopieren
+                    </button>
+                     <button id="close-modal-button-bottom" type="button"
+                            class="w-full sm:w-auto inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                        Schließen
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // WICHTIG: API_BASE_URL anpassen, falls dein Backend nicht unter http://localhost:8005 läuft.
+    // In Sandbox-Umgebungen (wie dem Canvas) kann der Zugriff auf `localhost` blockiert sein
+    // oder es können Mixed-Content-Probleme auftreten (HTTPS-Frontend versucht, HTTP-Backend aufzurufen).
+    // Stelle sicher, dass das Backend erreichbar ist und CORS korrekt konfiguriert ist.
+    const API_BASE_URL = window.location.origin; 
+    const uploadForm = document.getElementById('upload-form');
+    const uploadButton = document.getElementById('upload-button');
+    const uploadSpinner = document.getElementById('upload-spinner');
+    const jobsListContainer = document.getElementById('jobs-list-container');
+    const noJobsMessage = document.getElementById('no-jobs-message');
+    const refreshJobsButton = document.getElementById('refresh-jobs-button');
+    const refreshIcon = document.getElementById('refresh-icon');
+    const refreshSpinner = document.getElementById('refresh-spinner');
+    const notificationContainer = document.getElementById('notification-container');
+
+    const resultModal = document.getElementById('result-modal');
+    const closeModalButton = document.getElementById('close-modal-button');
+    const closeModalButtonBottom = document.getElementById('close-modal-button-bottom');
+    const modalTitle = document.getElementById('modal-title-heading');
+    const modalMetadata = document.getElementById('modal-metadata');
+    const modalTranscriptionText = document.getElementById('modal-transcription-text');
+    const modalDownloadLinkContainer = document.getElementById('modal-download-link-container');
+    const copyTextButton = document.getElementById('copy-text-button');
+
+    let activePolls = {}; // { jobId: intervalId }
+    const POLLING_INTERVAL = 5000; // Millisekunden
+
+    // --- Benachrichtigungen ---
+    function showToast(message, type = 'info', duration = 4000) {
+        const toastId = 'toast-' + Date.now();
+        const toast = document.createElement('div');
+        toast.id = toastId;
+        toast.className = `toast p-4 rounded-md text-sm font-medium max-w-xs sm:max-w-sm toast-enter-from`;
+        
+        let bgColor, textColor, borderColor, iconSvg;
+
+        switch (type) {
+            case 'success':
+                bgColor = 'bg-green-50'; textColor = 'text-green-700'; borderColor = 'border-green-300';
+                iconSvg = `<svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>`;
+                break;
+            case 'error':
+                bgColor = 'bg-red-50'; textColor = 'text-red-700'; borderColor = 'border-red-300';
+                iconSvg = `<svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-10a1 1 0 00-2 0v4a1 1 0 002 0V8zm-1 8a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg>`;
+                break;
+            default: // info
+                bgColor = 'bg-blue-50'; textColor = 'text-blue-700'; borderColor = 'border-blue-300';
+                iconSvg = `<svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-6a1 1 0 00-2 0v4a1 1 0 102 0v-4zm-1-3a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd"></path></svg>`;
+        }
+        toast.classList.add(bgColor, textColor, borderColor, 'border');
+        toast.innerHTML = `<div class="flex items-center">${iconSvg}<span>${message}</span></div>`;
+        
+        notificationContainer.appendChild(toast);
+        requestAnimationFrame(() => { 
+            toast.classList.remove('toast-enter-from');
+            toast.classList.add('toast-enter-to');
+        });
+
+        setTimeout(() => {
+            toast.classList.remove('toast-enter-to');
+            toast.classList.add('toast-leave-to');
+            toast.addEventListener('transitionend', () => toast.remove());
+        }, duration);
+    }
+
+    // --- Job-Rendering ---
+    function getStatusBadgeClass(status) {
+        if (!status) return 'bg-gray-100 text-gray-800';
+        switch (status.toLowerCase()) {
+            case 'completed': return 'bg-green-100 text-green-800';
+            case 'processing': return 'bg-blue-100 text-blue-800 animate-pulse';
+            case 'pending': return 'bg-yellow-100 text-yellow-800';
+            case 'failed': return 'bg-red-100 text-red-800';
+            default: return 'bg-gray-100 text-gray-800';
+        }
+    }
+
+    function renderJob(job) {
+        const jobCard = document.createElement('div');
+        jobCard.className = 'job-card bg-gray-50 p-4 rounded-lg shadow-md border border-gray-200';
+        jobCard.dataset.jobId = job.job_id;
+
+        const createdAtDate = new Date(job.created_at);
+        const formattedDate = createdAtDate.toLocaleDateString('de-DE', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        const formattedTime = createdAtDate.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+
+        let progressBarHtml = '';
+        if (job.status === 'processing' && job.progress_percent !== null && job.progress_percent !== undefined) {
+            const stageText = job.progress_stage ? ` (${job.progress_stage})` : '';
+            const percentVal = Math.max(0, Math.min(100, job.progress_percent)); // Clamp between 0 and 100
+            progressBarHtml = `
+                <div class="mt-2">
+                    <p class="text-xs text-gray-500 mb-1">Fortschritt: ${percentVal.toFixed(1)}%${stageText}</p>
+                    <div class="progress-bar-bg rounded-full h-2.5 w-full overflow-hidden">
+                        <div class="progress-bar-fill h-2.5 rounded-full" style="width: ${percentVal}%"></div>
+                    </div>
+                </div>
+            `;
+        } else if (job.status === 'completed') {
+             progressBarHtml = `
+                <div class="mt-2">
+                     <p class="text-xs text-gray-500 mb-1">Abgeschlossen</p>
+                    <div class="progress-bar-bg rounded-full h-2.5 w-full overflow-hidden">
+                        <div class="progress-bar-fill completed h-2.5 rounded-full" style="width: 100%"></div>
+                    </div>
+                </div>`;
+        } else if (job.status === 'failed') {
+             const percentValFailed = (job.progress_percent !== null && job.progress_percent !== undefined) ? Math.max(0, Math.min(100, job.progress_percent)) : 100;
+             progressBarHtml = `
+                <div class="mt-2">
+                     <p class="text-xs text-red-600 mb-1">Fehlgeschlagen ${job.progress_stage ? `(${job.progress_stage})` : ''}</p>
+                    <div class="progress-bar-bg rounded-full h-2.5 w-full overflow-hidden">
+                        <div class="progress-bar-fill failed h-2.5 rounded-full" style="width: ${percentValFailed}%"></div>
+                    </div>
+                </div>`;
+        }
+
+
+        let actionsHtml = `<div class="actions mt-4 pt-3 border-t border-gray-200 flex flex-wrap gap-2 justify-end">`;
+        if (job.status === 'completed' && job.download_url) {
+            actionsHtml += `
+                <button class="view-result-btn text-sm bg-green-500 hover:bg-green-600 text-white py-1.5 px-3 rounded-md transition-colors" data-job-id="${job.job_id}">Ergebnis</button>
+                <a href="${API_BASE_URL}${job.download_url}" target="_blank" download class="download-protocol-btn text-sm bg-blue-500 hover:bg-blue-600 text-white py-1.5 px-3 rounded-md transition-colors">Protokoll <span class="text-xs">(TXT)</span></a>
+            `;
+        } else if (job.status === 'failed') {
+             actionsHtml += `<button class="view-error-btn text-sm bg-yellow-500 hover:bg-yellow-600 text-white py-1.5 px-3 rounded-md transition-colors" data-job-id="${job.job_id}">Fehlerdetails</button>`;
+        }
+        
+        actionsHtml += `<button class="delete-job-btn text-sm bg-red-500 hover:bg-red-600 text-white py-1.5 px-3 rounded-md transition-colors" data-job-id="${job.job_id}">Löschen</button>`;
+        actionsHtml += `</div>`;
+
+        jobCard.innerHTML = `
+            <div class="flex justify-between items-start">
+                <div>
+                    <h3 class="font-semibold text-lg text-gray-800 break-all">${job.file_name || 'Unbekannte Datei'}</h3>
+                    <p class="text-sm text-gray-500">${job.municipality || 'N/A'} - ${job.meeting_type || 'N/A'}</p>
+                    <p class="text-xs text-gray-400">Erstellt: ${formattedDate} ${formattedTime} | Job ID: ${job.job_id ? job.job_id.substring(0,8) : 'N/A'}</p>
+                </div>
+                <span class="status-badge text-xs font-semibold px-2.5 py-0.5 rounded-full ${getStatusBadgeClass(job.status)}">${job.status ? (job.status.charAt(0).toUpperCase() + job.status.slice(1)) : 'Unbekannt'}</span>
+            </div>
+            ${progressBarHtml}
+            ${actionsHtml}
+        `;
+        return jobCard;
+    }
+
+    async function fetchJobs(showLoading = true) {
+        if (showLoading && refreshIcon && refreshSpinner) {
+            refreshIcon.classList.add('hidden');
+            refreshSpinner.classList.remove('hidden');
+        }
+        try {
+            const response = await fetch(`${API_BASE_URL}/jobs/`);
+            if (!response.ok) {
+                let errorMsg = `Fehler beim Laden der Jobs: ${response.status}. `;
+                errorMsg += `Stelle sicher, dass das Backend unter ${API_BASE_URL} läuft und erreichbar ist.`;
+                if (window.location.protocol === "https:" && API_BASE_URL.startsWith("http:")) {
+                     errorMsg += " Möglicherweise ein Mixed-Content-Problem (HTTPS-Frontend zu HTTP-Backend).";
+                }
+                showToast(errorMsg, 'error', 10000); 
+                if (jobsListContainer) jobsListContainer.innerHTML = `<p class="text-red-500 text-center py-4">${errorMsg}</p>`;
+                if (noJobsMessage) noJobsMessage.classList.add('hidden');
+                return;
+            }
+            const jobs = await response.json();
+            if (jobsListContainer) jobsListContainer.innerHTML = ''; 
+
+            if (jobs.length === 0) {
+                if (noJobsMessage) noJobsMessage.classList.remove('hidden');
+            } else {
+                if (noJobsMessage) noJobsMessage.classList.add('hidden');
+                jobs.sort((a, b) => {
+                    const statusOrder = { processing: 1, pending: 2, completed: 3, failed: 4 };
+                    const statusA = a.status ? statusOrder[a.status.toLowerCase()] || 5 : 5;
+                    const statusB = b.status ? statusOrder[b.status.toLowerCase()] || 5 : 5;
+                    if (statusA !== statusB) {
+                        return statusA - statusB;
+                    }
+                    return new Date(b.created_at) - new Date(a.created_at);
+                });
+
+                jobs.forEach(job => {
+                    const jobCard = renderJob(job);
+                    if (jobsListContainer) jobsListContainer.appendChild(jobCard);
+                    if (job.status === 'processing' && !activePolls[job.job_id]) {
+                        startJobPolling(job.job_id);
+                    } else if (job.status === 'completed' || job.status === 'failed') {
+                        stopJobPolling(job.job_id);
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Fetch Jobs Error:', error);
+            let errorMsg = `Netzwerkfehler beim Laden der Jobs. Details: ${error.message}. `;
+            errorMsg += ` Überprüfe die Backend-Verbindung (${API_BASE_URL}) und die Browser-Konsole auf CORS oder Netzwerkprobleme.`;
+            showToast(errorMsg, 'error', 10000);
+            if (jobsListContainer) jobsListContainer.innerHTML = `<p class="text-red-500 text-center py-4">${errorMsg}</p>`;
+            if (noJobsMessage) noJobsMessage.classList.add('hidden');
+        } finally {
+            if (showLoading && refreshIcon && refreshSpinner) {
+                refreshIcon.classList.remove('hidden');
+                refreshSpinner.classList.add('hidden');
+            }
+        }
+    }
+
+    async function pollJobStatus(jobId) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/jobs/${jobId}`);
+            if (!response.ok) {
+                console.warn(`Polling für Job ${jobId} fehlgeschlagen: Status ${response.status}`);
+                if (response.status === 404 && jobsListContainer) { 
+                    stopJobPolling(jobId);
+                    const existingCard = jobsListContainer.querySelector(`.job-card[data-job-id="${jobId}"]`);
+                    if (existingCard) existingCard.remove();
+                    showToast(`Job ${jobId.substring(0,8)} nicht mehr gefunden. Polling gestoppt.`, 'info');
+                    if (jobsListContainer.children.length === 0 || (jobsListContainer.children.length === 1 && jobsListContainer.firstChild.id === 'no-jobs-message')) {
+                        if (noJobsMessage) noJobsMessage.classList.remove('hidden');
+                    }
+                }
+                return;
+            }
+            const job = await response.json();
+            if (jobsListContainer) {
+                const existingCard = jobsListContainer.querySelector(`.job-card[data-job-id="${job.job_id}"]`);
+                if (existingCard) {
+                    const newCard = renderJob(job); 
+                    existingCard.replaceWith(newCard);
+                } else { 
+                    const newCard = renderJob(job);
+                    jobsListContainer.appendChild(newCard); 
+                    if (jobsListContainer.children.length > 0 && noJobsMessage) noJobsMessage.classList.add('hidden');
+                }
+            }
+
+
+            if (job.status === 'completed' || job.status === 'failed') {
+                stopJobPolling(job.job_id);
+                if (job.status === 'completed') {
+                    showToast(`Job '${(job.file_name || "Unbekannt").substring(0,20)}...' abgeschlossen!`, 'success');
+                } else {
+                    showToast(`Job '${(job.file_name || "Unbekannt").substring(0,20)}...' fehlgeschlagen.`, 'error');
+                }
+            }
+        } catch (error) {
+            console.error(`Polling Error für Job ${jobId}:`, error);
+        }
+    }
+
+    function startJobPolling(jobId) {
+        if (activePolls[jobId]) return; 
+        console.log(`Starte Polling für Job ${jobId}`);
+        activePolls[jobId] = setInterval(() => pollJobStatus(jobId), POLLING_INTERVAL);
+        pollJobStatus(jobId); 
+    }
+
+    function stopJobPolling(jobId) {
+        if (activePolls[jobId]) {
+            console.log(`Stoppe Polling für Job ${jobId}`);
+            clearInterval(activePolls[jobId]);
+            delete activePolls[jobId];
+        }
+    }
+    
+    if (uploadForm) {
+        uploadForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            if(uploadButton) uploadButton.disabled = true;
+            if(uploadSpinner) uploadSpinner.classList.remove('hidden');
+
+            const formData = new FormData(uploadForm);
+            const diarizeCheckbox = document.getElementById('diarize');
+            if (diarizeCheckbox) {
+                 formData.set('diarize', diarizeCheckbox.checked ? 'true' : 'false');
+            }
+
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/transcribe/`, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                const responseData = await response.json();
+
+                if (!response.ok) {
+                    showToast(`Fehler: ${responseData.detail || response.statusText || 'Unbekannter Fehler'}`, 'error');
+                } else {
+                    showToast(`Transkription für '${responseData.file_name}' gestartet.`, 'success');
+                    uploadForm.reset(); 
+                    const today = new Date().toISOString().split('T')[0];
+                    const meetingDateInput = document.getElementById('meeting_date');
+                    if(meetingDateInput) meetingDateInput.value = today;
+
+                    await fetchJobs(false); 
+                    if (responseData.job_id && (responseData.status === 'pending' || responseData.status === 'processing')) {
+                       startJobPolling(responseData.job_id);
+                    }
+                }
+            } catch (error) {
+                console.error('Upload Error:', error);
+                showToast(`Netzwerkfehler beim Starten der Transkription. Details: ${error.message}`, 'error');
+            } finally {
+                if(uploadButton) uploadButton.disabled = false;
+                if(uploadSpinner) uploadSpinner.classList.add('hidden');
+            }
+        });
+    }
+
+    if (jobsListContainer) {
+        jobsListContainer.addEventListener('click', async (event) => {
+            const targetButton = event.target.closest('button');
+            if (!targetButton) return;
+
+            const jobId = targetButton.dataset.jobId;
+            if (!jobId) return;
+
+            if (targetButton.classList.contains('view-result-btn')) {
+                await viewResult(jobId);
+            } else if (targetButton.classList.contains('delete-job-btn')) {
+                if (confirm(`Soll der Job ${jobId.substring(0,8)} wirklich gelöscht werden?`)) {
+                    await deleteJob(jobId);
+                }
+            } else if (targetButton.classList.contains('view-error-btn')) {
+                await viewErrorDetails(jobId);
+            }
+        });
+    }
+    
+    async function viewErrorDetails(jobId) {
+        let jobData = null;
+        try {
+            const response = await fetch(`${API_BASE_URL}/jobs/${jobId}`);
+            if (response.ok) {
+                jobData = await response.json();
+            } else {
+                 showToast(`Fehler beim Abrufen der Jobdetails für Fehleranzeige: ${response.status}`, 'error');
+                 return;
+            }
+        } catch(e) {
+            showToast(`Netzwerkfehler beim Abrufen der Jobdetails: ${e.message}`, 'error');
+            return;
+        }
+
+        if (modalTitle) modalTitle.textContent = `Fehlerdetails für Job ${jobId.substring(0,8)}`;
+        let errorHtml = `<p class="font-semibold">Datei: ${jobData.file_name || 'Unbekannt'}</p>`;
+        errorHtml += `<p>Status: <span class="font-medium text-red-600">${jobData.status || 'failed'}</span></p>`;
+        errorHtml += `<p>Stage: ${jobData.progress_stage || 'error'}</p>`;
+        errorHtml += `<p class="mt-4">Ein Fehler ist während der Verarbeitung aufgetreten. Wenn das Problem weiterhin besteht, überprüfen Sie bitte die Server-Logs für detaillierte Informationen oder kontaktieren Sie den Support.</p>`;
+        
+        const contentArea = document.getElementById('modal-content-area');
+        if (modalMetadata) modalMetadata.innerHTML = ''; 
+        if (modalTranscriptionText) modalTranscriptionText.value = ''; 
+        if (modalDownloadLinkContainer) modalDownloadLinkContainer.innerHTML = ''; 
+        
+        if (contentArea) contentArea.innerHTML = `<div class="p-4 bg-red-50 border border-red-200 rounded-md">${errorHtml}</div>`;
+        if (resultModal) resultModal.classList.remove('hidden');
+    }
+
+
+    async function deleteJob(jobId) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/jobs/${jobId}`, { method: 'DELETE' });
+            const responseData = await response.json().catch(() => null); 
+
+            if (!response.ok) {
+                showToast(`Fehler beim Löschen: ${responseData ? responseData.detail : response.statusText}`, 'error');
+                return;
+            }
+            showToast(responseData.message || `Job ${jobId.substring(0,8)} gelöscht.`, 'info');
+            stopJobPolling(jobId); 
+            if (jobsListContainer) {
+                const jobCard = jobsListContainer.querySelector(`.job-card[data-job-id="${jobId}"]`);
+                if (jobCard) {
+                    jobCard.remove();
+                }
+                if (jobsListContainer.children.length === 0 || 
+                    (jobsListContainer.children.length === 1 && jobsListContainer.firstChild.id === 'no-jobs-message')) {
+                    if (noJobsMessage) noJobsMessage.classList.remove('hidden');
+                }
+            }
+        } catch (error) {
+            console.error('Delete Job Error:', error);
+            showToast(`Netzwerkfehler beim Löschen des Jobs. Details: ${error.message}`, 'error');
+        }
+    }
+    
+    async function viewResult(jobId) {
+        try {
+            const response = await fetch(`${API_BASE_URL}/results/${jobId}`);
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ detail: 'Ergebnis nicht abrufbar.' }));
+                showToast(`Fehler beim Abrufen des Ergebnisses: ${errorData.detail || response.statusText}`, 'error');
+                return;
+            }
+            const result = await response.json(); 
+
+            if (modalTitle) modalTitle.textContent = `Ergebnis: ${result.file_name}`;
+            
+            let metadataHTML = `
+                <p><strong>Gemeinde:</strong> ${result.municipality}</p>
+                <p><strong>Sitzungsdatum:</strong> ${new Date(result.meeting_date + 'T00:00:00').toLocaleDateString('de-DE')}</p>
+                <p><strong>Sitzungstyp:</strong> ${result.meeting_type}</p>
+                <p><strong>Verarbeitungszeit:</strong> ${result.processing_time ? result.processing_time.toFixed(2) : 'N/A'} Sekunden</p>
+            `;
+            if(modalMetadata) modalMetadata.innerHTML = metadataHTML;
+
+            if(modalTranscriptionText) modalTranscriptionText.value = result.transcription_text;
+            
+            let downloadLinkHTML = '';
+            if (result.download_url) {
+                downloadLinkHTML = `
+                    <a href="${API_BASE_URL}${result.download_url}" target="_blank" download 
+                       class="inline-flex items-center justify-center rounded-md border border-transparent bg-green-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Protokoll herunterladen (TXT)
+                    </a>`;
+            }
+            if(modalDownloadLinkContainer) modalDownloadLinkContainer.innerHTML = downloadLinkHTML;
+            
+            const contentArea = document.getElementById('modal-content-area');
+            if (contentArea) { // Stelle sicher, dass contentArea existiert
+                 contentArea.innerHTML = ` 
+                    <div id="modal-metadata" class="text-gray-600 space-y-1 bg-gray-50 p-3 rounded-md">${metadataHTML}</div>
+                    <div class="mt-4">
+                        <h4 class="text-md font-medium text-gray-800 mb-2">Transkriptionstext:</h4>
+                        <textarea id="modal-transcription-text" readonly 
+                                  class="w-full h-64 p-3 border border-gray-300 rounded-md bg-gray-50 text-gray-700 focus:ring-1 focus:ring-blue-500 focus:border-blue-500">${result.transcription_text}</textarea>
+                    </div>
+                    <div id="modal-download-link-container" class="mt-4">${downloadLinkHTML}</div>`;
+            }
+            
+            if (resultModal) resultModal.classList.remove('hidden');
+        } catch (error) {
+            console.error('View Result Error:', error);
+            showToast(`Netzwerkfehler beim Anzeigen des Ergebnisses. Details: ${error.message}`, 'error');
+        }
+    }
+
+    if (closeModalButton) closeModalButton.addEventListener('click', () => resultModal.classList.add('hidden'));
+    if (closeModalButtonBottom) closeModalButtonBottom.addEventListener('click', () => resultModal.classList.add('hidden'));
+    if (resultModal) {
+        resultModal.addEventListener('click', (event) => { 
+            if (event.target === resultModal) {
+                resultModal.classList.add('hidden');
+            }
+        });
+    }
+
+    if (copyTextButton) {
+        copyTextButton.addEventListener('click', () => {
+            const textToCopyEl = document.getElementById('modal-transcription-text');
+            if (!textToCopyEl) return;
+            const textToCopy = textToCopyEl.value; 
+            if (!textToCopy) {
+                showToast('Kein Text zum Kopieren vorhanden.', 'info');
+                return;
+            }
+            if (navigator.clipboard && window.isSecureContext) { 
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    showToast('Text in die Zwischenablage kopiert!', 'success');
+                }).catch(err => {
+                    console.warn('Navigator.clipboard.writeText fehlgeschlagen:', err);
+                    fallbackCopyTextToClipboard(textToCopy);
+                });
+            } else {
+                fallbackCopyTextToClipboard(textToCopy);
+            }
+        });
+    }
+
+
+    function fallbackCopyTextToClipboard(text) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed"; 
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+                showToast('Text in die Zwischenablage kopiert! (Fallback)', 'success');
+            } else {
+                showToast('Kopieren fehlgeschlagen (Fallback).', 'error');
+            }
+        } catch (errFallback) {
+            showToast('Kopieren fehlgeschlagen.', 'error');
+            console.error('Fallback-Kopieren fehlgeschlagen:', errFallback);
+        }
+        document.body.removeChild(textArea);
+    }
+
+    if (refreshJobsButton) {
+        refreshJobsButton.addEventListener('click', () => fetchJobs());
+    }
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        const today = new Date().toISOString().split('T')[0];
+        const meetingDateInput = document.getElementById('meeting_date');
+        if (meetingDateInput) { 
+            meetingDateInput.value = today;
+        }
+        
+        fetchJobs(); 
+    });
+
+</script>
+</body>
+</html>

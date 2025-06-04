@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  protokoll-service-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PIP_INDEX: ${PIP_INDEX:-https://gisu669.gisamgmt.global/nexus/repository/pip-external/pypi}
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://gisu669.gisamgmt.global/nexus/repository/pip-external/simple}
+        PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-gisu669.gisamgmt.global}
+        
+    container_name: protokoll-service-gpu
+    restart: unless-stopped
+    
+    ports:
+      - "8005:8005"
+      
+    # ===== GPU-ZUGRIFF (NVIDIA Container Toolkit bevorzugt) =====
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+        limits:
+          memory: 32G
+        reservations:
+          memory: 16G
+    
+    # ===== FALLBACK: Legacy GPU-ZUGRIFF =====
+    devices:
+      - "/dev/nvidia0:/dev/nvidia0"
+      - "/dev/nvidiactl:/dev/nvidiactl"
+      - "/dev/nvidia-modeset:/dev/nvidia-modeset"
+      - "/dev/nvidia-uvm:/dev/nvidia-uvm"
+      - "/dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools"
+      - "/dev/nvidia-caps/nvidia-cap1:/dev/nvidia-caps/nvidia-cap1"
+      - "/dev/nvidia-caps/nvidia-cap2:/dev/nvidia-caps/nvidia-cap2"
+      
+    volumes:
+      # ===== NUR DATEN-VOLUMES (keine CUDA/cuDNN-Mounts) =====
+      - ./uploads:/app/uploads
+      - ./results:/app/results  
+      - ./protocols:/app/protocols
+      
+      # Modell-Cache
+      - ./model_cache:/app/.cache/huggingface
+      - ./torch_cache:/app/.cache/torch
+      - ./whisper_cache:/app/.cache/whisper
+      
+      # DIREKTE Modell-Mounts
+      - ./models--jonatasgrosman--wav2vec2-large-xlsr-53-german:/app/.cache/huggingface/hub/models--jonatasgrosman--wav2vec2-large-xlsr-53-german
+      - ./models--Systran--faster-whisper-large-v2:/app/.cache/whisper/models--Systran--faster-whisper-large-v2
+      
+    environment:
+      - TZ=Europe/Berlin
+      - HUGGINGFACE_TOKEN=${HUGGINGFACE_TOKEN:-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}
+      - DEVICE=cuda
+      - CUDA_VISIBLE_DEVICES=0
+      - NVIDIA_VISIBLE_DEVICES=0
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics
+      
+      # Cache-Konfiguration
+      - HF_HOME=/app/.cache/huggingface
+      - TRANSFORMERS_CACHE=/app/.cache/huggingface/transformers
+      - TORCH_HOME=/app/.cache/torch
+      - WHISPER_CACHE_DIR=/app/.cache/whisper
+      
+      # Alignment-spezifisch
+      - ALLOW_ONLINE_MODEL_DOWNLOAD=true
+      
+      # ===== GPU MEMORY & CUDA OPTIMIERUNG =====
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:2048,expandable_segments:True
+      - CUDA_MEMORY_FRACTION=0.8
+      
+      # cuDNN-Optimierungen (Bibliotheken im Image)
+      - TORCH_CUDNN_V8_API_ENABLED=1
+      - CUDNN_DETERMINISTIC=0
+      - CUDNN_BENCHMARK=1
+      
+      # LD_LIBRARY_PATH (cuDNN via Dockerfile eingebaut)
+      - LD_LIBRARY_PATH=/usr/local/lib/cudnn:/usr/local/lib/python3.11/site-packages/nvidia/cudnn/lib/:/usr/local/lib/python3.11/site-packages/nvidia/cuda_runtime/lib/:/usr/local/lib/python3.11/site-packages/nvidia/cublas/lib/:${LD_LIBRARY_PATH}
+      
+    shm_size: '4gb'
+    
+    healthcheck:
+      test: ["CMD", "python", "-c", "import torch; print('CUDA:', torch.cuda.is_available()); print('cuDNN:', torch.backends.cudnn.is_available()); import whisperx; print('WhisperX ready')"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 180s
+      
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+        
+    init: true
