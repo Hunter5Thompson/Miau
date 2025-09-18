@@ -1,0 +1,13 @@
+version: "3.9"
+
+services:
+  multi-agent-search:
+    build:
+      context: ../..
+      dockerfile: services/multi_agent/Dockerfile
+    environment:
+      MULTI_AGENT_GOAL: "Identify state-of-the-art reranker models for information retrieval"
+      MULTI_AGENT_CONSTRAINTS: "Prefer peer-reviewed sources,Highlight results from 2022 onwards"
+    tty: true
+    stdin_open: true
+    command: []
