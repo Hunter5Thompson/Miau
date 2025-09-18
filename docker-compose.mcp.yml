@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: mcp
+      POSTGRES_PASSWORD: mcp
+      POSTGRES_DB: crawl4ai_mcp
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mcp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    environment:
+      C4MCP_DATABASE_DSN: postgresql://mcp:mcp@db:5432/crawl4ai_mcp
+      C4MCP_LOG_LEVEL: INFO
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8051:8051"
+    command: uvicorn crawl4ai_mcp.http_app:app --host 0.0.0.0 --port 8051
+
+  adminer:
+    image: adminer:4.8.1
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: db
+    depends_on:
+      - db
+    ports:
+      - "8080:8080"
